@@ -1,18 +1,18 @@
 //
-//  ArduinoSPI.hpp
+//  ArduinoInterface.hpp
 //  
 //
 //  Created by Austyn Larkin on 2/11/18.
 //
 //
 
-#ifndef ArduinoSPI_hpp
-#define ArduinoSPI_hpp
+#ifndef ArduinoInterface_hpp
+#define ArduinoInterface_hpp
 
 #include "NRF24L01Interface.hpp"
 
 namespace nRF24L01 {
-    class ArduinoSPI : public NRF24L01Interface {
+    class ArduinoInterface : public NRF24L01Interface {
     public:
         void begin();
         void end();
@@ -26,7 +26,7 @@ namespace nRF24L01 {
         void delay(unsigned int d);
         void delayMicroseconds(unsigned int d);
         
-        ArduinoSPI(IRQAndSSHolder *s): NRF24L01Interface(s) {
+        ArduinoInterface(IRQAndSSHolder *s): NRF24L01Interface(s) {
             _IRQPin = s->getIRQPin();
             _SSPin = s->getSSPin();
         }
@@ -35,4 +35,4 @@ namespace nRF24L01 {
     };
 }
 
-#endif /* ArduinoSPI_hpp */
+#endif /* ArduinoInterface_hpp */
