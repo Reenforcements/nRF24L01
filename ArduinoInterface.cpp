@@ -16,8 +16,8 @@ namespace nRF24L01 {
         SPI.begin();
         // Convert the pin number to the interrupt
         SPI.usingInterrupt( digitalPinToInterrupt(_IRQPin) );
-        pinMode(_SSPin, OUTPUT);
-        digitalWrite(_SSPin, HIGH);
+        pinMode(_CSNPin, OUTPUT);
+        digitalWrite(_CSNPin, HIGH);
     }
     void ArduinoInterface::end() {
         SPI.end();
@@ -28,10 +28,10 @@ namespace nRF24L01 {
             Up to 10 Mbps, most significant bits first, clock pulses high for writing/reading and changes data on the trailing edge of each clock cycle.
          */
         SPI.beginTransaction( SPISettings(2000000, MSBFIRST, SPI_MODE0) );
-        digitalWrite(_SSPin, LOW);
+        writeCSNLow();
     }
     void ArduinoInterface::endTransaction() {
-        digitalWrite(_SSPin, HIGH);
+        writeCSNHigh();
         SPI.endTransaction();
     }
     unsigned char ArduinoInterface::transferByte(unsigned char b) {
@@ -46,5 +46,18 @@ namespace nRF24L01 {
     }
     void ArduinoInterface::delayMicroseconds(unsigned int d) {
         ::delayMicroseconds(d);
+    }
+    
+    void ArduinoInterface::writeCSNHigh() {
+        digitalWrite(_CSNPin, HIGH);
+    }
+    void ArduinoInterface::writeCSNLow() {
+        digitalWrite(_CSNPin, LOW);
+    }
+    void ArduinoInterface::writeCEHigh() {
+        digitalWrite(_CEPin, HIGH);
+    }
+    void ArduinoInterface::writeCELow() {
+        digitalWrite(_CEPin, LOW);
     }
 }

@@ -10,4 +10,4 @@
 #include "NRF24L01Interface.hpp"
 #include <Arduino.h>
 
-// Can't separate templated classes
+// Can't separate templated classes easily

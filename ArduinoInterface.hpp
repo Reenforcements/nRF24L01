@@ -26,12 +26,16 @@ namespace nRF24L01 {
         void delay(unsigned int d);
         void delayMicroseconds(unsigned int d);
         
-        ArduinoInterface(IRQAndSSHolder *s): NRF24L01Interface(s) {
-            _IRQPin = s->getIRQPin();
-            _SSPin = s->getSSPin();
+        void writeCSNHigh();
+        void writeCSNLow();
+        void writeCEHigh();
+        void writeCELow();
+        
+        ArduinoInterface(SpecialPinHolder *s): NRF24L01Interface(s) {
+            
         }
     private:
-        signed char _ssPin = -1;
+        
     };
 }
 

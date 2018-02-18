@@ -11,10 +11,10 @@
 
 namespace nRF24L01 {
     
-    class IRQAndSSHolder {
+    class SpecialPinHolder {
     public:
         virtual unsigned char getIRQPin() const = 0;
-        virtual unsigned char getSSPin() const = 0;
+        virtual unsigned char getCSNPin() const = 0;
         virtual unsigned char getCEPin() const = 0;
     };
     
@@ -33,13 +33,19 @@ namespace nRF24L01 {
         virtual void delay(unsigned int d) = 0;
         virtual void delayMicroseconds(unsigned int d) = 0;
         
-        NRF24L01Interface(IRQAndSSHolder *s) {
+        virtual void writeCSNHigh() = 0;
+        virtual void writeCSNLow() = 0;
+        virtual void writeCEHigh() = 0;
+        virtual void writeCELow() = 0;
+        
+        NRF24L01Interface(SpecialPinHolder *s) {
             _IRQPin = s->getIRQPin();
-            _SSPin = s->getSSPin();
+            _CSNPin = s->getCSNPin();
+            _CEPin = s->getCEPin();
         }
     protected:
         unsigned char _IRQPin;
-        unsigned char _SSPin;
+        unsigned char _CSNPin;
         unsigned char _CEPin;
     };
 }
