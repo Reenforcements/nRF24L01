@@ -40,6 +40,7 @@ namespace nRF24L01 {
     protected:
         unsigned char _IRQPin;
         unsigned char _SSPin;
+        unsigned char _CEPin;
     };
 }
 
