@@ -15,7 +15,7 @@ namespace nRF24L01 {
     template <class T>
     class Controller: public SpecialPinHolder {
     public:
-        Controller(unsigned char CEPin, unsigned char IRQPin, unsigned char CSNPin = 10): _CEPin(CEPin), _IRQPin(IRQPin), _CSNPin(CSNPin), _poweredUp(false), _mode(Mode::None) {
+        Controller(unsigned char CEPin, unsigned char IRQPin, unsigned char CSNPin = 10): _CEPin(CEPin), _IRQPin(IRQPin), _CSNPin(CSNPin), _poweredUp(false), _mode(Mode::None), _ACKEnabled(true) {
             _NRF24L01Interface = new T(static_cast<SpecialPinHolder*>(this));
             // Wait for radio to power on.
             _NRF24L01Interface->delay(100);
@@ -33,14 +33,14 @@ namespace nRF24L01 {
                     
                     // Read the CONFIG register
                     _NRF24L01Interface->beginTransaction();
-                                           _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
+                    _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
                     unsigned char config = _NRF24L01Interface->transferByte(Commands::NOP);
                     _NRF24L01Interface->endTransaction();
                     
                     // Write the CONFIG register with the PWR_UP bit on.
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::CONFIG);
-                    _NRF24L01Interface->transferByte(config | PWR_UP);
+                    _NRF24L01Interface->transferByte(config | Bits::PWR_UP);
                     _NRF24L01Interface->endTransaction();
                     
                     // Wait 1.5ms
@@ -91,7 +91,18 @@ namespace nRF24L01 {
         }
         
         void setPrimaryReceiver() {
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
+            unsigned char config = _NRF24L01Interface->transferByte(Commands::NOP);
+            _NRF24L01Interface->endTransaction();
             
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::CONFIG);
+            // Set PRIM_RX to 0 to be a primary transmitter
+            _NRF24L01Interface->transferByte(config | Bits::PRIM_RX);
+            _NRF24L01Interface->endTransaction();
+            
+            _mode = Mode::PTX;
         }
         
         void setAddress(unsigned char address[], unsigned char addressSize) {
@@ -109,13 +120,34 @@ namespace nRF24L01 {
                     break;
                 }
                 case Mode::PRX: {
-                    // TODO: Set RX address
+                    // TODO: Set the RX thing
                     break;
                 }
                 default:
                     break;
             }
         }
+        
+        void setACKEnabled(bool ACKEnabled) {
+            
+        }
+        
+        void sendData(unsigned char *data, unsigned char size) {
+            // Choose a write command based on whether or not we want an ACK
+            unsigned char writeCommand = (_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
+            
+            // Fill the TX FIFO with the data.
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(writeCommand);
+            _NRF24L01Interface->transferBytes(&data, size);
+            _NRF24L01Interface->endTransaction();
+            // Pulse the CE pin to send.
+            _NRF24L01Interface->writeCEHigh();
+            _NRF24L01Interface->delayMicroseconds(11);
+            _NRF24L01Interface->writeCELow();
+        }
+        
+        
         
         void test_readAddress(unsigned char address[], unsigned char addressSize) {
             // Read the address back out
@@ -127,11 +159,22 @@ namespace nRF24L01 {
         
         unsigned int getStatusAndConfigRegisters() {
             _NRF24L01Interface->beginTransaction();
-            unsigned char status = _NRF24L01Interface->transferByte(Commands::R_REGISTER & Registers::CONFIG);
+            unsigned char status = _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
             unsigned char config = _NRF24L01Interface->transferByte(Commands::NOP);
             _NRF24L01Interface->endTransaction();
             return (((unsigned int)status) << 8) | ((unsigned int)config);
         }
+        
+        unsigned char getInterruptBits() {
+            const unsigned char mask = (RX_DR | TX_DS | MAX_RT);
+            // Get the status register and also clear the interrupt bits.
+            _NRF24L01Interface->beginTransaction();
+            unsigned char status = _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::STATUS);
+            _NRF24L01Interface->transferByte(mask);
+            _NRF24L01Interface->endTransaction();
+            return mask & status;
+        }
+        
     private:
         // Private member variables
         T *_NRF24L01Interface;
@@ -140,6 +183,7 @@ namespace nRF24L01 {
         unsigned char _CSNPin;
         unsigned char _CEPin;
         Mode _mode;
+        bool _ACKEnabled;
         
         // Command constants
         enum Commands : unsigned char {
@@ -233,7 +277,6 @@ namespace nRF24L01 {
             RX_EMPTY = 1 << 0
             
         };
-        
         
         /**
          Used by the SPI interface to get the interrupt pin number
