@@ -21,6 +21,7 @@ namespace nRF24L01 {
             _NRF24L01Interface->delay(100);
             // Begin the SPI and pass this object so SPI can get our interrupt pin
             _NRF24L01Interface->begin();
+            getAndClearInterruptBits();
         }
         ~Controller() {
             delete _NRF24L01Interface;
@@ -102,12 +103,25 @@ namespace nRF24L01 {
             _NRF24L01Interface->transferByte(config | Bits::PRIM_RX);
             _NRF24L01Interface->endTransaction();
             
-            _mode = Mode::PTX;
+            // Hold CE high
+            _NRF24L01Interface->writeCEHigh();
+            
+            _mode = Mode::PRX;
+        }
+        
+        void setReceivedPacketLength(unsigned char numberBytes) {
+            _receivedPacketLength = numberBytes & 0b00111111;
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RX_PW_P0);
+            _NRF24L01Interface->transferByte( _receivedPacketLength );
+            _NRF24L01Interface->endTransaction();
         }
         
         void setAddress(unsigned char address[], unsigned char addressSize) {
             switch(_mode) {
                 case Mode::PTX: {
+                    // TODO: Change the address length register
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::TX_ADDR);
                     _NRF24L01Interface->transferBytes(&address, addressSize);
@@ -120,7 +134,10 @@ namespace nRF24L01 {
                     break;
                 }
                 case Mode::PRX: {
-                    // TODO: Set the RX thing
+                    _NRF24L01Interface->beginTransaction();
+                    _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RX_ADDR_P0);
+                    _NRF24L01Interface->transferBytes(&address, addressSize);
+                    _NRF24L01Interface->endTransaction();
                     break;
                 }
                 default:
@@ -129,25 +146,48 @@ namespace nRF24L01 {
         }
         
         void setACKEnabled(bool ACKEnabled) {
+//            _ACKEnabled = ACKEnabled;
+//            
+//            _NRF24L01Interface->beginTransaction();
+//            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FEATURE);
+//            unsigned char feature = _NRF24L01Interface->transferByte(Commands::NOP);
+//            _NRF24L01Interface->endTransaction();
             
+            // Use EN_DPL
+            // Fix dis it doesn't even check for ACKEnabled
+//            _NRF24L01Interface->beginTransaction();
+//            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::FEATURE);
+//            // EN_DYN_ACK should be enabled if ack is enabled
+//            _NRF24L01Interface->transferByte(feature | Bits::EN_ACK_PAY | (_ACKEnabled ? EN_DYN_ACK : 0) );
+//            _NRF24L01Interface->endTransaction();
         }
         
         void sendData(unsigned char *data, unsigned char size) {
             // Choose a write command based on whether or not we want an ACK
-            unsigned char writeCommand = (_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
+            unsigned char writeCommand = W_TX_PAYLOAD;//(_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
             
             // Fill the TX FIFO with the data.
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(writeCommand);
             _NRF24L01Interface->transferBytes(&data, size);
             _NRF24L01Interface->endTransaction();
+            
             // Pulse the CE pin to send.
             _NRF24L01Interface->writeCEHigh();
-            _NRF24L01Interface->delayMicroseconds(11);
+            _NRF24L01Interface->delayMicroseconds(10);
             _NRF24L01Interface->writeCELow();
         }
         
+        void readData(unsigned char *dataOut) {
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_RX_PAYLOAD);
+            _NRF24L01Interface->transferBytes(&dataOut, _receivedPacketLength);
+            _NRF24L01Interface->endTransaction();
+        }
         
+        void cancelSending() {
+            _NRF24L01Interface->writeCELow();
+        }
         
         void test_readAddress(unsigned char address[], unsigned char addressSize) {
             // Read the address back out
@@ -165,11 +205,18 @@ namespace nRF24L01 {
             return (((unsigned int)status) << 8) | ((unsigned int)config);
         }
         
-        unsigned char getInterruptBits() {
+        unsigned char getAndClearInterruptBits() {
             const unsigned char mask = (RX_DR | TX_DS | MAX_RT);
+            
             // Get the status register and also clear the interrupt bits.
             _NRF24L01Interface->beginTransaction();
-            unsigned char status = _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::STATUS);
+            // Clear the interrupt bits as we receive them.
+            unsigned char status = _NRF24L01Interface->transferByte(Commands::NOP);
+            _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::STATUS);
             _NRF24L01Interface->transferByte(mask);
             _NRF24L01Interface->endTransaction();
             return mask & status;
@@ -182,6 +229,7 @@ namespace nRF24L01 {
         unsigned char _IRQPin;
         unsigned char _CSNPin;
         unsigned char _CEPin;
+        unsigned char _receivedPacketLength;
         Mode _mode;
         bool _ACKEnabled;
         
@@ -223,8 +271,11 @@ namespace nRF24L01 {
             RX_ADDR_P0 = 0x0A,
             TX_ADDR = 0x10,
             
-            FIFO_STATUS = 0x17
+            RX_PW_P0 = 0x11,
             
+            FIFO_STATUS = 0x17,
+            
+            FEATURE = 0x1D
         };
         
         // Bit constants
@@ -274,8 +325,11 @@ namespace nRF24L01 {
             TX_FULL_FIFO__STATUS = 1 << 5,
             TX_EMPTY = 1 << 4,
             RX_FULL = 1 << 1,
-            RX_EMPTY = 1 << 0
+            RX_EMPTY = 1 << 0,
             
+            // FEATURE
+            EN_ACK_PAY = 1 << 1,
+            EN_DYN_ACK = 1 << 0
         };
         
         /**
