@@ -205,6 +205,15 @@ namespace nRF24L01 {
             return (((unsigned int)status) << 8) | ((unsigned int)config);
         }
         
+        unsigned char getFIFOStatus() {
+            //FIFO_STATUS
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FIFO_STATUS);
+            unsigned char fifo = _NRF24L01Interface->transferByte(Commands::NOP);
+            _NRF24L01Interface->endTransaction();
+            return fifo;
+        }
+        
         unsigned char getAndClearInterruptBits() {
             const unsigned char mask = (RX_DR | TX_DS | MAX_RT);
             
