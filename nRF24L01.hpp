@@ -147,26 +147,29 @@ namespace nRF24L01 {
         }
         
         void setAddress(unsigned char address[], unsigned char addressSize) {
+            unsigned char storage[5];
+            unsigned char *tempAddress = storage;
+            
             switch(_mode) {
                 case Mode::PTX: {
                     // TODO: Change the address length register
-                    unsigned char ta[5];
-                    unsigned char *tempAddress = ta;
-                    ta[0] = address[0];
-                    ta[1] = address[1];
-                    ta[2] = address[2];
-                    ta[3] = address[3];
-                    ta[4] = address[4];
+                   
+                    storage[0] = address[0];
+                    storage[1] = address[1];
+                    storage[2] = address[2];
+                    storage[3] = address[3];
+                    storage[4] = address[4];
+                    
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::TX_ADDR);
                     _NRF24L01Interface->transferBytes(&tempAddress, addressSize);
                     _NRF24L01Interface->endTransaction();
                     
-                    ta[0] = address[0];
-                    ta[1] = address[1];
-                    ta[2] = address[2];
-                    ta[3] = address[3];
-                    ta[4] = address[4];
+                    storage[0] = address[0];
+                    storage[1] = address[1];
+                    storage[2] = address[2];
+                    storage[3] = address[3];
+                    storage[4] = address[4];
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RX_ADDR_P0);
                     _NRF24L01Interface->transferBytes(&tempAddress, addressSize);
@@ -174,9 +177,15 @@ namespace nRF24L01 {
                     break;
                 }
                 case Mode::PRX: {
+                    storage[0] = address[0];
+                    storage[1] = address[1];
+                    storage[2] = address[2];
+                    storage[3] = address[3];
+                    storage[4] = address[4];
+                    
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RX_ADDR_P0);
-                    _NRF24L01Interface->transferBytes(&address, addressSize);
+                    _NRF24L01Interface->transferBytes(&tempAddress, addressSize);
                     _NRF24L01Interface->endTransaction();
                     break;
                 }
@@ -306,7 +315,7 @@ namespace nRF24L01 {
             FLUSH_RX = 0b11100010,
             REUSE_TX_PL = 0b11100011,
             
-            // a
+            // a Read the size of the top R_RX_PAYLOAD in the FIFO
             R_RX_PL_WID = 0b01100000,
             // a
             W_ACK_PAYLOAD = 0b10101000,
