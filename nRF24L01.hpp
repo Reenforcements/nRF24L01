@@ -109,6 +109,34 @@ namespace nRF24L01 {
             _mode = Mode::PRX;
         }
         
+        void setAutoAcknowledgementEnabled(bool enabled) {
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::EN_AA);
+            _NRF24L01Interface->transferByte(enabled ? BITS_EN_AA : 0x00);
+            _NRF24L01Interface->endTransaction();
+
+        }
+        
+        // Enable dynamic payload length data pipes. (Requires EN_DPL and ENAA_P0-5)
+        void setUsesDynamicPayloadLength(bool uses) {
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::DYNPD);
+            _NRF24L01Interface->transferByte(uses ? Bits::DPL_P : 0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            // Read the feature register
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FEATURE);
+            unsigned char feature = _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::FEATURE);
+            _NRF24L01Interface->transferByte( uses ? feature | Bits::EN_DPL : (feature & (~Bits::EN_DPL) ) );
+            _NRF24L01Interface->endTransaction();
+        }
+        
         void setReceivedPacketLength(unsigned char numberBytes) {
             _receivedPacketLength = numberBytes & 0b00111111;
             
@@ -122,14 +150,26 @@ namespace nRF24L01 {
             switch(_mode) {
                 case Mode::PTX: {
                     // TODO: Change the address length register
+                    unsigned char ta[5];
+                    unsigned char *tempAddress = ta;
+                    ta[0] = address[0];
+                    ta[1] = address[1];
+                    ta[2] = address[2];
+                    ta[3] = address[3];
+                    ta[4] = address[4];
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::TX_ADDR);
-                    _NRF24L01Interface->transferBytes(&address, addressSize);
+                    _NRF24L01Interface->transferBytes(&tempAddress, addressSize);
                     _NRF24L01Interface->endTransaction();
                     
+                    ta[0] = address[0];
+                    ta[1] = address[1];
+                    ta[2] = address[2];
+                    ta[3] = address[3];
+                    ta[4] = address[4];
                     _NRF24L01Interface->beginTransaction();
                     _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RX_ADDR_P0);
-                    _NRF24L01Interface->transferBytes(&address, addressSize);
+                    _NRF24L01Interface->transferBytes(&tempAddress, addressSize);
                     _NRF24L01Interface->endTransaction();
                     break;
                 }
@@ -143,6 +183,10 @@ namespace nRF24L01 {
                 default:
                     break;
             }
+        }
+        
+        unsigned char *readAddress() {
+            
         }
         
         void setACKEnabled(bool ACKEnabled) {
@@ -162,9 +206,18 @@ namespace nRF24L01 {
 //            _NRF24L01Interface->endTransaction();
         }
         
-        void sendData(unsigned char *data, unsigned char size) {
+        
+        void setChannel(unsigned char channel) {
+            channel = channel & Bits::BITS_RF_CH;
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::REGISTER_RF_CH);
+            _NRF24L01Interface->transferByte(channel);
+            _NRF24L01Interface->endTransaction();
+        }
+        
+        void sendData(unsigned char *data, unsigned char size, bool noACK = false) {
             // Choose a write command based on whether or not we want an ACK
-            unsigned char writeCommand = W_TX_PAYLOAD;//(_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
+            unsigned char writeCommand = noACK ? W_TX_PAYLOAD_NO_ACK : W_TX_PAYLOAD;//(_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
             
             // Fill the TX FIFO with the data.
             _NRF24L01Interface->beginTransaction();
@@ -217,13 +270,12 @@ namespace nRF24L01 {
         unsigned char getAndClearInterruptBits() {
             const unsigned char mask = (RX_DR | TX_DS | MAX_RT);
             
-            // Get the status register and also clear the interrupt bits.
+            // Get the status register
             _NRF24L01Interface->beginTransaction();
-            // Clear the interrupt bits as we receive them.
             unsigned char status = _NRF24L01Interface->transferByte(Commands::NOP);
-            _NRF24L01Interface->transferByte(0x00);
             _NRF24L01Interface->endTransaction();
             
+            // Clear the interrupt bits
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::STATUS);
             _NRF24L01Interface->transferByte(mask);
@@ -284,6 +336,7 @@ namespace nRF24L01 {
             
             FIFO_STATUS = 0x17,
             
+            DYNPD = 0x1C,
             FEATURE = 0x1D
         };
         
@@ -298,6 +351,9 @@ namespace nRF24L01 {
             PWR_UP = 1 << 1,
             // 1: PRX, 0: PTX
             PRIM_RX = 1 << 0,
+            
+            // EN_AA
+            BITS_EN_AA = 0b00111111,
             
             // SETUP_AW
             AW = 0b00000011,
@@ -336,7 +392,11 @@ namespace nRF24L01 {
             RX_FULL = 1 << 1,
             RX_EMPTY = 1 << 0,
             
+            // DYNPD
+            DPL_P = 0b00111111,
+            
             // FEATURE
+            EN_DPL = 1 << 2,
             EN_ACK_PAY = 1 << 1,
             EN_DYN_ACK = 1 << 0
         };
@@ -368,3 +428,5 @@ namespace nRF24L01 {
  /*
  At 2Mbps the channel occupies a bandwidth wider than the resolution of the RF channel frequency setting. To ensure non-overlapping channels in 2Mbps mode, the channel spacing must be 2MHz or more. At 1Mbps and 250kbps the channel bandwidth is the same or lower than the resolution of the RF frequency.
  */
+
+
