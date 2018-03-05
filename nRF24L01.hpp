@@ -137,6 +137,7 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
+        // Sets the static received packet length. This can be used instead of using dynamic packet lengths.
         void setReceivedPacketLength(unsigned char numberBytes) {
             _receivedPacketLength = numberBytes & 0b00111111;
             
@@ -194,28 +195,6 @@ namespace nRF24L01 {
             }
         }
         
-        unsigned char *readAddress() {
-            
-        }
-        
-        void setACKEnabled(bool ACKEnabled) {
-//            _ACKEnabled = ACKEnabled;
-//            
-//            _NRF24L01Interface->beginTransaction();
-//            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FEATURE);
-//            unsigned char feature = _NRF24L01Interface->transferByte(Commands::NOP);
-//            _NRF24L01Interface->endTransaction();
-            
-            // Use EN_DPL
-            // Fix dis it doesn't even check for ACKEnabled
-//            _NRF24L01Interface->beginTransaction();
-//            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::FEATURE);
-//            // EN_DYN_ACK should be enabled if ack is enabled
-//            _NRF24L01Interface->transferByte(feature | Bits::EN_ACK_PAY | (_ACKEnabled ? EN_DYN_ACK : 0) );
-//            _NRF24L01Interface->endTransaction();
-        }
-        
-        
         void setChannel(unsigned char channel) {
             channel = channel & Bits::BITS_RF_CH;
             _NRF24L01Interface->beginTransaction();
@@ -240,10 +219,19 @@ namespace nRF24L01 {
             _NRF24L01Interface->writeCELow();
         }
         
-        void readData(unsigned char *dataOut) {
+        unsigned char getNextPacketSize() {
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_RX_PL_WID);
+            unsigned char packetSize = _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            return packetSize;
+        }
+        
+        void readData(unsigned char *dataOut, unsigned char length = 0) {
+            
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::R_RX_PAYLOAD);
-            _NRF24L01Interface->transferBytes(&dataOut, _receivedPacketLength);
+            _NRF24L01Interface->transferBytes(&dataOut, length != 0 ? length : _receivedPacketLength);
             _NRF24L01Interface->endTransaction();
         }
         
@@ -291,6 +279,10 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
             return mask & status;
         }
+        
+        static const unsigned char INTERRUPT_BIT_RX_DR = 1 << 6;
+        static const unsigned char INTERRUPT_BIT_TX_DS = 1 << 5;
+        static const unsigned char INTERRUPT_BIT_MAX_RT = 1 << 4;
         
     private:
         // Private member variables
