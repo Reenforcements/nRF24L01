@@ -15,13 +15,13 @@ namespace nRF24L01 {
     template <class T>
     class Controller: public SpecialPinHolder {
     public:
-        Controller(unsigned char CEPin, unsigned char IRQPin, unsigned char CSNPin = 10): _CEPin(CEPin), _IRQPin(IRQPin), _CSNPin(CSNPin), _poweredUp(false), _mode(Mode::None), _ACKEnabled(true) {
+        Controller(unsigned char CEPin, unsigned char IRQPin, unsigned char CSNPin = 10): _CEPin(CEPin), _IRQPin(IRQPin), _CSNPin(CSNPin), _poweredUp(false), _mode(Mode::None), _ACKEnabled(true), _lastInterruptBits(0) {
             _NRF24L01Interface = new T(static_cast<SpecialPinHolder*>(this));
             // Wait for radio to power on.
             _NRF24L01Interface->delay(100);
             // Begin the SPI and pass this object so SPI can get our interrupt pin
             _NRF24L01Interface->begin();
-            getAndClearInterruptBits();
+            readAndClearInterruptBits();
         }
         ~Controller() {
             delete _NRF24L01Interface;
@@ -151,6 +151,26 @@ namespace nRF24L01 {
             unsigned char storage[5];
             unsigned char *tempAddress = storage;
             
+            //SETUP_AW
+            unsigned char newAddressSize = 0b11;
+            switch(addressSize) {
+                case 3:
+                    newAddressSize = 0b01;
+                    break;
+                case 4:
+                    newAddressSize = 0b10;
+                    break;
+                case 5:
+                default:
+                    newAddressSize = 0b11;
+                    break;
+            }
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::SETUP_AW);
+            _NRF24L01Interface->transferByte(newAddressSize);
+            _NRF24L01Interface->endTransaction();
+            
             switch(_mode) {
                 case Mode::PTX: {
                     // TODO: Change the address length register
@@ -195,6 +215,11 @@ namespace nRF24L01 {
             }
         }
         
+        /**
+         Sets the channel that the nRF operates on. The channel of the transmitter must match the channel of the receiver.
+
+         @param channel An integer from 0 to 127.
+         */
         void setChannel(unsigned char channel) {
             channel = channel & Bits::BITS_RF_CH;
             _NRF24L01Interface->beginTransaction();
@@ -203,7 +228,68 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
-        void sendData(unsigned char *data, unsigned char size, bool noACK = false) {
+        
+        /**
+         Sets the data rate of the transceiver
+
+         @param bitrate 0 for 250kbps, 1 for 1Mbps, and 2 for 2Mbps
+         */
+        void setBitrate(unsigned char bitrate) {
+            unsigned char bits = 0;
+            switch(bitrate) {
+                case 0:
+                    bits = Bits::RF_DR_LOW;
+                    break;
+                case 1:
+                    bits = 0;
+                    break;
+                case 2:
+                default:
+                    bits = Bits::RF_DR_HIGH;
+                    break;
+            }
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::RF_SETUP);
+            unsigned char rfsetup = _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            rfsetup = (rfsetup & (~(Bits::RF_DR_LOW | Bits::RF_DR_HIGH))) | bits;
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::RF_SETUP);
+            _NRF24L01Interface->transferByte(rfsetup);
+            _NRF24L01Interface->endTransaction();
+        }
+        
+        
+        /**
+         Sets the amount of times to try auto retransmitting the packet
+
+         @param char retryCount 0 - 15
+         */
+        void setAutoRetransmitCount(unsigned char retryCount) {
+            //SETUP_RETR
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::SETUP_RETR);
+            unsigned char setupretr = _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::SETUP_RETR);
+            _NRF24L01Interface->transferByte( (setupretr & Bits::ARD) | (retryCount & Bits::ARC) );
+            _NRF24L01Interface->endTransaction();
+        }
+        
+        /**
+         ***MUST BE PAIRED WITH A CALL TO `concludeSendingPacket`*** 
+         Starts the process of sending a packet using the nRF.
+
+         @param data The data to send.
+         @param size The number of bytes to send.
+         @param noACK Requires dynamic ACK to be enabled. If enabled, setting this parameter to true will disable ACK for this single packet.
+         */
+        void startSendingPacket(unsigned char *data, unsigned char size, bool noACK = false) {
             // Choose a write command based on whether or not we want an ACK
             unsigned char writeCommand = noACK ? W_TX_PAYLOAD_NO_ACK : W_TX_PAYLOAD;//(_ACKEnabled) ? Commands::W_TX_PAYLOAD : Commands::W_TX_PAYLOAD_NO_ACK;
             
@@ -215,10 +301,22 @@ namespace nRF24L01 {
             
             // Pulse the CE pin to send.
             _NRF24L01Interface->writeCEHigh();
-            _NRF24L01Interface->delayMicroseconds(10);
+        }
+        
+        
+        /**
+         Ends a packet send operation. Call this
+         */
+        void concludeSendingPacket() {
             _NRF24L01Interface->writeCELow();
         }
         
+        
+        /**
+         Reads the size of the next packeted queued in the receiving queue on the nRF (if there is a next packet)
+
+         @return The number of bytes in the next packet (if there's a packet waiting.)
+         */
         unsigned char getNextPacketSize() {
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::R_RX_PL_WID);
@@ -227,6 +325,13 @@ namespace nRF24L01 {
             return packetSize;
         }
         
+        
+        /**
+         Reads a packet of data from the nRF.
+
+         @param dataOut The array to hold the data read from the nRF.
+         @param length The length of the array given.
+         */
         void readData(unsigned char *dataOut, unsigned char length = 0) {
             
             _NRF24L01Interface->beginTransaction();
@@ -235,18 +340,12 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
-        void cancelSending() {
-            _NRF24L01Interface->writeCELow();
-        }
         
-        void test_readAddress(unsigned char address[], unsigned char addressSize) {
-            // Read the address back out
-            _NRF24L01Interface->beginTransaction();
-            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::TX_ADDR);
-            _NRF24L01Interface->transferBytes(&address, addressSize);
-            _NRF24L01Interface->endTransaction();
-        }
-        
+        /**
+         Returns the 8 bit status and 8 bit config registers as a 16 bit unsigned integer.
+
+         @return ((status << 8) | config)
+         */
         unsigned int getStatusAndConfigRegisters() {
             _NRF24L01Interface->beginTransaction();
             unsigned char status = _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
@@ -255,6 +354,12 @@ namespace nRF24L01 {
             return (((unsigned int)status) << 8) | ((unsigned int)config);
         }
         
+        
+        /**
+         Get the status of the FIFO register
+
+         @return The FIFO register contents
+         */
         unsigned char getFIFOStatus() {
             //FIFO_STATUS
             _NRF24L01Interface->beginTransaction();
@@ -264,7 +369,13 @@ namespace nRF24L01 {
             return fifo;
         }
         
-        unsigned char getAndClearInterruptBits() {
+        
+        /**
+         Gets the interrupt bits from the STATUS register and subsequently clears the interrupts bits from the STATUS register. You should call this methods from your interrupt before calling `didReceivePayload`, `didSendPayload`, and `didHitMaxRetry`. You only need to call this once per interrupt trigger though.
+
+         @return None, see didReceivePayload, didSendPayload, and didHitMaxRetry
+         */
+        void readAndClearInterruptBits() {
             const unsigned char mask = (RX_DR | TX_DS | MAX_RT);
             
             // Get the status register
@@ -277,7 +388,36 @@ namespace nRF24L01 {
             _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::STATUS);
             _NRF24L01Interface->transferByte(mask);
             _NRF24L01Interface->endTransaction();
-            return mask & status;
+            
+            _lastInterruptBits = mask & status;
+        }
+        
+        
+        /**
+         Call this method after calling `readAndClearInterruptBits` to see if this was the reason the interrupt was triggered.
+
+         @return `true` if this is the reason the interrupt was triggered.
+         */
+        bool didReceivePayload() {
+            return ((_lastInterruptBits & INTERRUPT_BIT_RX_DR) > 0);
+        }
+        
+        /**
+         Call this method after calling `readAndClearInterruptBits` to see if this was the reason the interrupt was triggered.
+         
+         @return `true` if this is the reason the interrupt was triggered.
+         */
+        bool didSendPayload() {
+            return ((_lastInterruptBits & INTERRUPT_BIT_TX_DS) > 0);
+        }
+        
+        /**
+         Call this method after calling `readAndClearInterruptBits` to see if this was the reason the interrupt was triggered.
+         
+         @return `true` if this is the reason the interrupt was triggered.
+         */
+        bool didHitMaxRetry() {
+            return ((_lastInterruptBits & INTERRUPT_BIT_MAX_RT) > 0);
         }
         
         static const unsigned char INTERRUPT_BIT_RX_DR = 1 << 6;
@@ -288,12 +428,13 @@ namespace nRF24L01 {
         // Private member variables
         T *_NRF24L01Interface;
         bool _poweredUp;
-        unsigned char _IRQPin;
-        unsigned char _CSNPin;
-        unsigned char _CEPin;
-        unsigned char _receivedPacketLength;
-        Mode _mode;
-        bool _ACKEnabled;
+        volatile unsigned char _IRQPin;
+        volatile unsigned char _CSNPin;
+        volatile unsigned char _CEPin;
+        volatile unsigned char _receivedPacketLength;
+        volatile unsigned char _lastInterruptBits;
+        volatile Mode _mode;
+        volatile bool _ACKEnabled;
         
         // Command constants
         enum Commands : unsigned char {

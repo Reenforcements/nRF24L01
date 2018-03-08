@@ -27,7 +27,7 @@ namespace nRF24L01 {
         /*
             Up to 10 Mbps, most significant bits first, clock pulses high for writing/reading and changes data on the trailing edge of each clock cycle.
          */
-        SPI.beginTransaction( SPISettings(2000000, MSBFIRST, SPI_MODE0) );
+        SPI.beginTransaction( SPISettings(10000000, MSBFIRST, SPI_MODE0) );
         writeCSNLow();
     }
     void ArduinoInterface::endTransaction() {
