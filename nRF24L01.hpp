@@ -22,6 +22,7 @@ namespace nRF24L01 {
             // Begin the SPI and pass this object so SPI can get our interrupt pin
             _NRF24L01Interface->begin();
             readAndClearInterruptBits();
+            flushRXFIFO();
         }
         ~Controller() {
             delete _NRF24L01Interface;
@@ -228,6 +229,21 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
+        void setCRCEnabled(bool enabled) {
+            //EN_CRC
+            // Read the CONFIG register
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
+            unsigned char config = _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+            
+            // Write the CONFIG register with the PWR_UP bit on.
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::CONFIG);
+            _NRF24L01Interface->transferByte(enabled ? config | Bits::EN_CRC : config & (~(Bits::EN_CRC)) );
+            _NRF24L01Interface->endTransaction();
+        }
+        
         
         /**
          Sets the data rate of the transceiver
@@ -342,6 +358,17 @@ namespace nRF24L01 {
         
         
         /**
+         Clears all the data from the RX FIFO
+         */
+        void flushRXFIFO() {
+            //FLUSH_RX
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::FLUSH_RX);
+            _NRF24L01Interface->transferByte(0x00);
+            _NRF24L01Interface->endTransaction();
+        }
+        
+        /**
          Returns the 8 bit status and 8 bit config registers as a 16 bit unsigned integer.
 
          @return ((status << 8) | config)
@@ -367,6 +394,14 @@ namespace nRF24L01 {
             unsigned char fifo = _NRF24L01Interface->transferByte(Commands::NOP);
             _NRF24L01Interface->endTransaction();
             return fifo;
+        }
+        
+        bool dataInRXFIFO() {
+            _NRF24L01Interface->beginTransaction();
+            _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FIFO_STATUS);
+            unsigned char fifo = _NRF24L01Interface->transferByte(Commands::NOP);
+            _NRF24L01Interface->endTransaction();
+            return (fifo & 0b00000010) > 0 | (fifo & 0b00000001) == 0;
         }
         
         
