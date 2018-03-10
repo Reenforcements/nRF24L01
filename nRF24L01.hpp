@@ -28,6 +28,12 @@ namespace nRF24L01 {
             delete _NRF24L01Interface;
         }
         
+        
+        /**
+         Power up or power down the nRF
+
+         @param shouldPowerUp `true` to power up or `false` to power down.
+         */
         void setPoweredUp(bool shouldPowerUp) {
             if(shouldPowerUp) {
                 if(!_poweredUp) {
@@ -77,6 +83,10 @@ namespace nRF24L01 {
             PRX = 2
         };
         
+        
+        /**
+         Sets this transceiver as a primary transmitter
+         */
         void setPrimaryTransmitter() {
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
@@ -92,6 +102,10 @@ namespace nRF24L01 {
             _mode = Mode::PTX;
         }
         
+        
+        /**
+         Sets this transceiver as a primary receiver
+         */
         void setPrimaryReceiver() {
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::CONFIG);
@@ -110,6 +124,12 @@ namespace nRF24L01 {
             _mode = Mode::PRX;
         }
         
+        
+        /**
+         
+
+         @param enabled Enables or disables auto acknowledgement packets.
+         */
         void setAutoAcknowledgementEnabled(bool enabled) {
             
             _NRF24L01Interface->beginTransaction();
@@ -119,7 +139,12 @@ namespace nRF24L01 {
 
         }
         
-        // Enable dynamic payload length data pipes. (Requires EN_DPL and ENAA_P0-5)
+        
+        /**
+         Enable or disable dynamic payload length data pipes. (Requires EN_DPL and ENAA_P0-5)
+
+         @param uses `true` to enable, `false` to disable
+         */
         void setUsesDynamicPayloadLength(bool uses) {
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::W_REGISTER | Registers::DYNPD);
@@ -138,7 +163,12 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
-        // Sets the static received packet length. This can be used instead of using dynamic packet lengths.
+        
+        /**
+         Sets the static received packet length. This can be used instead of using dynamic packet lengths.
+
+         @param numberBytes The number of bytes that this receiver should receive each time from the transmitter.
+         */
         void setReceivedPacketLength(unsigned char numberBytes) {
             _receivedPacketLength = numberBytes & 0b00111111;
             
@@ -148,6 +178,13 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
+        
+        /**
+         Sets the internal address of the transceiver. A transmitter and receiver should have the same address.
+
+         @param address 3-5 bytes
+         @param addressSize The number of bytes in the address
+         */
         void setAddress(unsigned char address[], unsigned char addressSize) {
             unsigned char storage[5];
             unsigned char *tempAddress = storage;
@@ -229,6 +266,12 @@ namespace nRF24L01 {
             _NRF24L01Interface->endTransaction();
         }
         
+        
+        /**
+         Enable or disable CRC on incoming data (cyclic redundancy check)
+
+         @param enabled
+         */
         void setCRCEnabled(bool enabled) {
             //EN_CRC
             // Read the CONFIG register
@@ -321,7 +364,7 @@ namespace nRF24L01 {
         
         
         /**
-         Ends a packet send operation. Call this
+         Ends a packet send operation. Call this in your IRQ interrupt.
          */
         void concludeSendingPacket() {
             _NRF24L01Interface->writeCELow();
@@ -396,6 +439,12 @@ namespace nRF24L01 {
             return fifo;
         }
         
+        
+        /**
+         Checks the receiving FIFO
+
+         @return `true` if there's any data in the FIFO, otherwise false.
+         */
         bool dataInRXFIFO() {
             _NRF24L01Interface->beginTransaction();
             _NRF24L01Interface->transferByte(Commands::R_REGISTER | Registers::FIFO_STATUS);
