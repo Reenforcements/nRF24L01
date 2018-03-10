@@ -3,13 +3,15 @@ An nRF24L01 library for Arduino, built from scratch, as a school project. It's b
 
 ## Summary
 
-  The nRF24L01+ is a transceiver IC that is often built into cheap transceiver modules. These modules are often used with microcontrollers to provide wireless communication between two or more devices. Arduino is the most common microcontroller used, which this library directly supports.
+  The nRF24L01+ is a transceiver IC that is often built into cheap transceiver modules. These modules are often used with microcontrollers to provide wireless communication between two or more devices. Arduino is the most common microcontroller used, which this library directly supports. Generally, for a two transceiver system, one transceiver is set up as the _primary transmitter_ and the other is set up as the _primary receiver_. The primary receiver can still send data to the transmitter, but there are some requirements when doing this. First, _Automatic acknowledgement packets_ and _ACK payloads_ must be enabled. Second, the receiver can only _reply_ with data after receiving data from the transmitter. It can never initiate its own send operation.
 
 ## nRF24L01+ Modules
 
 Here's a picture of a common nRF module. It has an nRF24L01+ chip soldered onto a printed circuit board with a bunch of other necessary components. It also has a long range antenna, which greatly extends the range of the module.
 
 ![A picture of an nRF24L01+ module sitting on my desk.](Media/IMG_0818LowQuality.jpg)
+
+The nRF24L01+ claims data rates up to 2Mbps, but I've only been able to achieve about ~0.6Mbps.
 
 ### Pinout
 | Column 1 | Column 2 |
@@ -39,13 +41,29 @@ SCK is a clock signal that's used to keep the data transfer in sync.
 
 ##### IRQ
 
-This should be connected to an [interrupt on your Arduino](https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/). If you need help, please see the examples in the "Examples" directory.
+This should be connected to an [interrupt on your Arduino](https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/). The nRF will output this pin `LOW` when it needs the Arduino to handle an important event. Such events include: "The data send operation successfully completed", "We retried sending the data numerous times, but the other transceiver never received it", or "We received data from a transmitter and you should read it now." The sample code in the "Examples" directory shows an example of how to set this up.
 
 ## Installation
 
-Download the library as a zip file (or `git clone` if you'd prefer.) Move the `nRF24L1+` folder into the Arduino software's `libraries` directory. Restart the Arduino IDE.
+Download the library as a zip file (or `git clone` if you'd prefer.) Move the `nRF24L1` folder into the Arduino software's `libraries` directory. Restart the Arduino IDE.
 
 ## Sample Usage
+
+Please see the `Sender` and `Receiver` example sketches in the `Examples` directory.
+
+## The Enhanced Shockburst Protocol
+
+The nRF24L01+ sends and receives data using something called `Enhanced Shockburst`, which is a data transmission protocol that does a lot of the heavy lifting, making it super easy for us to send and receive data. It allows us to send data in convenient packets ranging from 1-32 bytes by merely uploading our data through SPI to the nRF. The nRF automatically handles sending/receiving these packets and will notify us by the IRQ pin of when we should write/read data. 
+
+The receiving nRF can also automatically notify the transmitting nRF that the data was successfully received through a feature called _automatic acknowledge packets_, in which the transmitter will temporarily change to receiving mode so the receiver can send an _ack packet_ saying that it received the data. The receiver can even send a small amount of data back with the ack packet, allowing bidirectional communication.
+
+And much like a computer on a network, each transceiver also has its own address (or addresses) associated with it. In addition to both transceivers being on the same channel, in order to send and receive data, the transmitter must be transmitting to the same address assigned to the receiver. This address can be 3-5 bytes. When a transceiver is a primary receiver, it constantly searches for a valid address in the demodulated signals it receives.
+
+### Packet Structure
+
+| Preamble | Address | Packet Control Field | Payload | CRC | 
+| ---- | ----- | ----- | ----- | ----- |
+| 1 byte | 3-5 bytes | 9 bits | 1-32 bytes | 1-2 bytes |
 
 ## Methods
 
