@@ -53,7 +53,7 @@ Please see the `Sender` and `Receiver` example sketches in the `Examples` direct
 
 ## The Enhanced Shockburst Protocol
 
-The nRF24L01+ sends and receives data using something called `Enhanced Shockburst`, which is a data transmission protocol that does a lot of the heavy lifting, making it super easy for us to send and receive data. It allows us to send data in convenient packets ranging from 1-32 bytes by merely uploading our data through SPI to the nRF. The nRF automatically handles sending/receiving these packets and will notify us by the IRQ pin of when we should write/read data. 
+The nRF24L01+ sends and receives data using something called `Enhanced Shockburst`, which is a data transmission protocol that does a lot of the heavy lifting for us, making it super easy to send and receive data between two or more microcontrollers. It allows us to send data in convenient packets ranging from 1-32 bytes by merely uploading our data through SPI to the nRF. The nRF automatically handles sending/receiving these packets and will notify us by the IRQ pin of when we should write/read data. 
 
 The receiving nRF can also automatically notify the transmitting nRF that the data was successfully received through a feature called _automatic acknowledge packets_, in which the transmitter will temporarily change to receiving mode so the receiver can send an _ack packet_ saying that it received the data. The receiver can even send a small amount of data back with the ack packet, allowing bidirectional communication.
 
@@ -61,10 +61,17 @@ And much like a computer on a network, each transceiver also has its own address
 
 ### Packet Structure
 
+Internally, this is what an Enhanced Shockburst packet looks like. The nRF automatically assembles/disassembles these packets for us, so in reality we never touch these ourselves.
+
 | Preamble | Address | Packet Control Field | Payload | CRC | 
 | ---- | ----- | ----- | ----- | ----- |
 | 1 byte | 3-5 bytes | 9 bits | 1-32 bytes | 1-2 bytes |
+| Automatically generated bit sequence that's used by the nRF to synchronize to the incoming stream of bits. | For *transmitters*, this is the address of the receiver we're sending data to. For *receivers*, this is the address that differentiates us from other receivers on the same channel. | These bits are hidden from the user and are used internally for payload length, packet identification, and whether or not to send an ACK upon receiving. | The data that we're sending or receiving. | CRC stands for cyclic redundancy check and helps the nRF figure out if any data was corrupted between being transmitted and received. |  
 
 ## Methods
 
+
+
 ## Porting the Library
+
+The library was designed to be easily ported to other microcontrollers. In order to add support for another microcontroller, create a new class that inherits from and implements all the virtual methods of `NRF24L01Interface`. For an example, please see the `ArduinoInterface` class.
