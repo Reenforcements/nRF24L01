@@ -15,6 +15,15 @@ namespace nRF24L01 {
     template <class T>
     class Controller: public SpecialPinHolder {
     public:
+        
+        /**
+         Controls a single nRF24L01+ module. You should instantiate this in your setup function and store it in a pointer.
+
+         @param CEPin The microcontroller pin hooked up to the CE pin on the nRF.
+         @param IRQPin The microcontroller pin hooked up to the IRQ pin of the nRF. This pin should also be set up as an interrupt so you can handle important events from the nRF as they happen.
+         @param CSNPin The chip select not pin (also called the SS or slave select pin.) This pin is used by SPI to enable the nRF when it wants to send/receive data through SPI.
+         @return An instance of `Controller`.
+         */
         Controller(unsigned char CEPin, unsigned char IRQPin, unsigned char CSNPin = 10): _CEPin(CEPin), _IRQPin(IRQPin), _CSNPin(CSNPin), _poweredUp(false), _mode(Mode::None), _ACKEnabled(true), _lastInterruptBits(0) {
             _NRF24L01Interface = new T(static_cast<SpecialPinHolder*>(this));
             // Wait for radio to power on.
@@ -30,7 +39,7 @@ namespace nRF24L01 {
         
         
         /**
-         Power up or power down the nRF
+         Power up or power down the nRF.
 
          @param shouldPowerUp `true` to power up or `false` to power down.
          */
@@ -85,7 +94,7 @@ namespace nRF24L01 {
         
         
         /**
-         Sets this transceiver as a primary transmitter
+         Sets this transceiver as a primary transmitter.
          */
         void setPrimaryTransmitter() {
             _NRF24L01Interface->beginTransaction();
@@ -104,7 +113,7 @@ namespace nRF24L01 {
         
         
         /**
-         Sets this transceiver as a primary receiver
+         Sets this transceiver as a primary receiver.
          */
         void setPrimaryReceiver() {
             _NRF24L01Interface->beginTransaction();
@@ -125,10 +134,11 @@ namespace nRF24L01 {
         }
         
         
+        
         /**
-         
+         Enables or disables auto acknowledgement packets.
 
-         @param enabled Enables or disables auto acknowledgement packets.
+         @param enabled `true` to enable or `false` to disable.
          */
         void setAutoAcknowledgementEnabled(bool enabled) {
             
@@ -270,7 +280,7 @@ namespace nRF24L01 {
         /**
          Enable or disable CRC on incoming data (cyclic redundancy check)
 
-         @param enabled
+         @param enabled `true` to enable or `false` to disable.
          */
         void setCRCEnabled(bool enabled) {
             //EN_CRC
@@ -325,7 +335,7 @@ namespace nRF24L01 {
         /**
          Sets the amount of times to try auto retransmitting the packet
 
-         @param char retryCount 0 - 15
+         @param char retryCount An integer from 0 - 15
          */
         void setAutoRetransmitCount(unsigned char retryCount) {
             //SETUP_RETR
