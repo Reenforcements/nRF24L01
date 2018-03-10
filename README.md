@@ -15,8 +15,8 @@ An nRF24L01 library for Arduino, built from scratch, as a school project. It's b
 | MOSI | SCK |
 | IRQ | MISO |
 
-##### V+ #####
-:  The supply voltage depends on the voltage of the GPIO you intend to connect to the nRF. If you have a microcontroller with `3.3v` IO, you should supply the module with `1.9-3.6v`. If however, you're using a microcontroller with `5v` IO, you should supply the module with `2.7-3.3v`.
+##### V+
+The supply voltage depends on the voltage of the GPIO you intend to connect to the nRF. If you have a microcontroller with `3.3v` IO, you should supply the module with `1.9-3.6v`. If however, you're using a microcontroller with `5v` IO, you should supply the module with `2.7-3.3v`.
 
 
 ## Installation
