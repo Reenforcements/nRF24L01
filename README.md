@@ -1,4 +1,6 @@
-# nRF24L01
+<span style="background-color:yellow;">Added value: Created a completely new, easily portable library for the nRF24L01+ based transceiver modules. Created by using the datasheet as a reference.</span>
+
+# nRF24L01+
 An nRF24L01 library for Arduino, built from scratch, as a school project. It's built in such a way that it can easily be ported over to other microcontrollers.
 
 ## Summary
