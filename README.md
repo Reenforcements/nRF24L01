@@ -288,3 +288,7 @@ Call this method after calling `readAndClearInterruptBits` to see if this was th
 ## Porting the Library
 
 The library was designed to be easily ported to other microcontrollers. In order to add support for another microcontroller, create a new class that inherits from and implements all the virtual methods of `NRF24L01Interface`. For an example, please see the `ArduinoInterface` class. The nRF24L01+ uses [SPI mode 0](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus#Mode_numbers).
+
+## Datasheet
+
+The datasheet for the nRF24L01+ can be found [here on Sparkfun](https://www.sparkfun.com/datasheets/Components/SMD/nRF24L01Pluss_Preliminary_Product_Specification_v1_0.pdf).
