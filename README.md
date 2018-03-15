@@ -1,6 +1,6 @@
 
 ## Added value: 
-*Created a completely new, easily portable library for the nRF24L01+ based transceiver modules. Created by using the datasheet as a reference.*
+*Created a completely new, easily portable library for the nRF24L01+ based transceiver modules. [Created by using the datasheet as a reference.](https://www.sparkfun.com/datasheets/Components/SMD/nRF24L01Pluss_Preliminary_Product_Specification_v1_0.pdf)*
 --
 
 # nRF24L01+
