@@ -68,8 +68,6 @@ Internally, this is what an Enhanced Shockburst packet looks like. The nRF autom
 | 1 byte | 3-5 bytes | 9 bits | 1-32 bytes | 1-2 bytes |
 | Automatically generated bit sequence that's used by the nRF to synchronize to the incoming stream of bits. | For *transmitters*, this is the address of the receiver we're sending data to. For *receivers*, this is the address that differentiates us from other receivers on the same channel. | These bits are hidden from the user and are used internally for payload length, packet identification, and whether or not to send an ACK upon receiving. | The data that we're sending or receiving. | CRC stands for cyclic redundancy check and helps the nRF figure out if any data was corrupted between being transmitted and received. |  
 
-## Methods
-
 # class `nRF24L01::Controller` 
 
 ```
