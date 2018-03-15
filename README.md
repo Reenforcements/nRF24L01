@@ -8,7 +8,7 @@ An nRF24L01 library for Arduino, built from scratch, as a school project. It's b
 
 ## Summary
 
-  The nRF24L01+ is a transceiver IC that is often built into cheap transceiver modules. These modules are often used with microcontrollers to provide wireless communication between two or more devices. Arduino is the most common microcontroller used, which this library directly supports. Generally, for a two transceiver system, one transceiver is set up as the _primary transmitter_ and the other is set up as the _primary receiver_. The primary receiver can still send data to the transmitter, but there are some requirements when doing this. First, _Automatic acknowledgement packets_ and _ACK payloads_ must be enabled. Second, the receiver can only _reply_ with data after receiving data from the transmitter. It can never initiate its own send operation.
+  The nRF24L01+ is a transceiver IC that is often built into cheap transceiver modules. These modules are often used with microcontrollers to provide wireless communication between two or more devices. Arduino is the most common microcontroller used, which this library directly supports. Generally, for a two transceiver system, one transceiver is set up as the _primary transmitter_ and the other is set up as the _primary receiver_. The primary transmitter can send packets which contain 1 to 32 bytes each. The primary receiver can still send data to the transmitter, but there are some requirements when doing this. First, _Automatic acknowledgement packets_ and _ACK payloads_ must be enabled. Second, the receiver can only _reply_ with data after receiving data from the transmitter. It can never initiate its own send operation. The max size of the ACK payload depends on multiple transceiver settings, but generally ranges from 5-15 bytes.
 
 ## nRF24L01+ Modules
 
@@ -16,7 +16,7 @@ Here's a picture of a common nRF module. It has an nRF24L01+ chip soldered onto 
 
 ![A picture of an nRF24L01+ module sitting on my desk.](Media/IMG_0818LowQuality.jpg)
 
-The nRF24L01+ claims data rates up to 2Mbps, but I've only been able to achieve about ~0.6Mbps.
+The nRF24L01+ claims data rates up to 2Mbps, but I've only been able to achieve about ~0.6Mbps. This is with strictly one way communication, though.
 
 ### Pinout
 | Column 1 | Column 2 |
@@ -46,7 +46,7 @@ SCK is a clock signal that's used to keep the data transfer in sync.
 
 ##### IRQ
 
-This should be connected to an [interrupt on your Arduino](https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/). The nRF will output this pin `LOW` when it needs the Arduino to handle an important event. Such events include: "The data send operation successfully completed", "We retried sending the data numerous times, but the other transceiver never received it", or "We received data from a transmitter and you should read it now." The sample code in the "Examples" directory shows an example of how to set this up.
+This should be connected to an [interrupt on your Arduino](https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/). The nRF will output this pin `LOW` when it needs the Arduino to handle an important event. Such events include: "The previously initiated data send operation successfully completed", "We retried sending the data numerous times, but the other transceiver never received it", or "We received data from a transmitter and you should read it now." The sample code in the "Examples" directory shows an example of how to set this up.
 
 ## Installation
 
